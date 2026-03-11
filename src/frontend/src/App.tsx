@@ -23,6 +23,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { InvoicesPage } from "./pages/InvoicesPage";
 import { ReportsPage } from "./pages/ReportsPage";
+import { SettingsPage } from "./pages/SettingsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -46,11 +47,9 @@ function PinScreen() {
     setError("");
     if (value.length === 4) {
       if (isSetup) {
-        // First step of setup: go to confirm
         setStep("confirm");
         setPin(value);
       } else {
-        // Verify against stored PIN
         if (value === storedPin) {
           sessionStorage.setItem(SESSION_KEY, "1");
           window.location.reload();
@@ -249,12 +248,19 @@ const reportsRoute = createRoute({
   component: ReportsPage,
 });
 
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings",
+  component: SettingsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
   customersRoute,
   inventoryRoute,
   invoicesRoute,
   reportsRoute,
+  settingsRoute,
 ]);
 
 const router = createRouter({ routeTree });

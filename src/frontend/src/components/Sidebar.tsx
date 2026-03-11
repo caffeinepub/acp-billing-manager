@@ -8,6 +8,7 @@ import {
   LogIn,
   LogOut,
   Package,
+  Settings,
   Users,
   Zap,
 } from "lucide-react";
@@ -19,6 +20,7 @@ const navItems = [
   { to: "/inventory", label: "Inventory", icon: Package },
   { to: "/invoices", label: "Invoices", icon: FileText },
   { to: "/reports", label: "Reports", icon: BarChart3 },
+  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {
