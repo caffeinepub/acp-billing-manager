@@ -120,13 +120,32 @@ export function useCreateProduct() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: {
-      name: string;
-      unit: string;
-      price: number;
-      stock: bigint;
+      brand: string;
+      grade: string;
+      colourCode: string;
+      colourName: string;
+      thickness: number;
+      length: number;
+      width: number;
+      qty: bigint;
+      sqft: number;
+      batchNo: string;
+      rate: number;
     }) => {
       if (!actor) throw new Error("No actor");
-      return actor.createProduct(data.name, data.unit, data.price, data.stock);
+      return actor.createProduct(
+        data.brand,
+        data.grade,
+        data.colourCode,
+        data.colourName,
+        data.thickness,
+        data.length,
+        data.width,
+        data.qty,
+        data.sqft,
+        data.batchNo,
+        data.rate,
+      );
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
   });
@@ -138,18 +157,32 @@ export function useUpdateProduct() {
   return useMutation({
     mutationFn: async (data: {
       id: Principal;
-      name: string;
-      unit: string;
-      price: number;
-      stock: bigint;
+      brand: string;
+      grade: string;
+      colourCode: string;
+      colourName: string;
+      thickness: number;
+      length: number;
+      width: number;
+      qty: bigint;
+      sqft: number;
+      batchNo: string;
+      rate: number;
     }) => {
       if (!actor) throw new Error("No actor");
       return actor.updateProduct(
         data.id,
-        data.name,
-        data.unit,
-        data.price,
-        data.stock,
+        data.brand,
+        data.grade,
+        data.colourCode,
+        data.colourName,
+        data.thickness,
+        data.length,
+        data.width,
+        data.qty,
+        data.sqft,
+        data.batchNo,
+        data.rate,
       );
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),

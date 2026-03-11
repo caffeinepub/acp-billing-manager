@@ -9,10 +9,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DollarSign, Package, TrendingUp, Users } from "lucide-react";
+import { IndianRupee, Package, TrendingUp, Users } from "lucide-react";
 import { useMemo } from "react";
 import { InvoiceStatus } from "../backend.d";
 import { useCustomers, useInvoices, useProducts } from "../hooks/useQueries";
+import { formatINR } from "../lib/currency";
 
 function invoiceTotal(items: { quantity: bigint; unitPrice: number }[]) {
   return items.reduce(
@@ -76,28 +77,26 @@ export function ReportsPage() {
 
   const lowStockProducts = useMemo(
     () =>
-      products
-        .filter((p) => p.stock < 10n)
-        .sort((a, b) => Number(a.stock - b.stock)),
+      products.filter((p) => p.qty < 10n).sort((a, b) => Number(a.qty - b.qty)),
     [products],
   );
 
   const summaryCards = [
     {
       label: "Total Revenue",
-      value: `$${stats.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      icon: DollarSign,
+      value: formatINR(stats.totalRevenue),
+      icon: IndianRupee,
       color: "text-primary",
     },
     {
       label: "Outstanding (Unpaid)",
-      value: `$${stats.unpaidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      value: formatINR(stats.unpaidAmount),
       icon: TrendingUp,
       color: "text-amber-400",
     },
     {
       label: "Avg. Invoice Value",
-      value: `$${stats.avgInvoice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      value: formatINR(stats.avgInvoice),
       icon: TrendingUp,
       color: "text-blue-400",
     },
@@ -200,11 +199,7 @@ export function ReportsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        $
-                        {tc.total.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                        {formatINR(tc.total)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -249,9 +244,9 @@ export function ReportsPage() {
               <Table data-ocid="reports.inventory.table">
                 <TableHeader>
                   <TableRow className="border-border hover:bg-transparent">
-                    <TableHead>Product</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
+                    <TableHead>Brand / Colour</TableHead>
+                    <TableHead>Batch No</TableHead>
+                    <TableHead className="text-right">Qty</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -261,13 +256,15 @@ export function ReportsPage() {
                       className="border-border bg-amber-500/5"
                       data-ocid={`reports.inventory.item.${i + 1}` as any}
                     >
-                      <TableCell className="font-medium">{p.name}</TableCell>
+                      <TableCell className="font-medium">
+                        {p.brand} - {p.colourName}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {p.unit}
+                        {p.batchNo}
                       </TableCell>
                       <TableCell className="text-right">
                         <span className="font-bold text-amber-400">
-                          {String(p.stock)}
+                          {String(p.qty)}
                         </span>
                       </TableCell>
                     </TableRow>

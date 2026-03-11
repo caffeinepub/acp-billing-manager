@@ -10,10 +10,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, DollarSign, Package, Users } from "lucide-react";
+import { AlertTriangle, IndianRupee, Package, Users } from "lucide-react";
 import { useMemo } from "react";
 import { InvoiceStatus } from "../backend.d";
 import { useCustomers, useInvoices, useProducts } from "../hooks/useQueries";
+import { formatINR } from "../lib/currency";
 
 function formatDate(date: bigint) {
   return new Date(Number(date / 1_000_000n)).toLocaleDateString();
@@ -40,7 +41,7 @@ export function DashboardPage() {
     const revenue = invoices
       .filter((inv) => inv.status === InvoiceStatus.paid)
       .reduce((sum, inv) => sum + invoiceTotal(inv.items), 0);
-    const lowStock = products.filter((p) => p.stock < 10n).length;
+    const lowStock = products.filter((p) => p.qty < 10n).length;
     return { revenue, lowStock };
   }, [invoices, products]);
 
@@ -66,8 +67,8 @@ export function DashboardPage() {
     },
     {
       label: "Revenue (Paid)",
-      value: `$${stats.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      icon: DollarSign,
+      value: formatINR(stats.revenue),
+      icon: IndianRupee,
       color: "text-primary",
     },
     {
@@ -184,11 +185,7 @@ export function DashboardPage() {
                       {formatDate(inv.date)}
                     </TableCell>
                     <TableCell className="font-medium">
-                      $
-                      {invoiceTotal(inv.items).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
+                      {formatINR(invoiceTotal(inv.items))}
                     </TableCell>
                     <TableCell>
                       <Badge

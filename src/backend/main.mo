@@ -15,10 +15,64 @@ import AccessControl "authorization/access-control";
 actor {
   let sales = Map.empty<Principal, Float>();
   let customers = Map.empty<Principal, Customer>();
-  let products = Map.empty<Principal, Product>();
   let invoices = Map.empty<Principal, Invoice>();
   let productSales = Map.empty<Principal, List.List<SaleEntry>>();
 
+  // ── Old Product type kept to absorb previously-stored stable data ──────────
+  // Do NOT rename or remove this; Motoko matches stable vars by name.
+  type OldProduct = {
+    id : Principal;
+    name : Text;
+    unit : Text;
+    price : Float;
+    stock : Nat;
+  };
+  let products = Map.empty<Principal, OldProduct>();
+
+  // ── New Product type ────────────────────────────────────────────────────────
+  public type Product = {
+    id : Principal;
+    brand : Text;
+    grade : Text;
+    colourCode : Text;
+    colourName : Text;
+    thickness : Float;
+    length : Float;
+    width : Float;
+    qty : Nat;
+    sqft : Float;
+    batchNo : Text;
+    rate : Float;
+  };
+
+  let productsV2 = Map.empty<Principal, Product>();
+  stable var migrationDone = false;
+
+  // One-time migration: convert old Products into the new schema.
+  system func postupgrade() {
+    if (not migrationDone) {
+      for (p in products.values()) {
+        let newP : Product = {
+          id = p.id;
+          brand = p.name;
+          grade = "";
+          colourCode = "";
+          colourName = "";
+          thickness = 0.0;
+          length = 0.0;
+          width = 0.0;
+          qty = p.stock;
+          sqft = 0.0;
+          batchNo = "";
+          rate = p.price;
+        };
+        productsV2.add(p.id, newP);
+      };
+      migrationDone := true;
+    };
+  };
+
+  // ── Other types ─────────────────────────────────────────────────────────────
   public type Customer = {
     id : Principal;
     name : Text;
@@ -28,26 +82,18 @@ actor {
   };
 
   module Customer {
-    public func compare(customer1 : Customer, customer2 : Customer) : Order.Order {
-      switch (Text.compare(customer1.name, customer2.name)) {
-        case (#equal) { Text.compare(customer1.email, customer2.email) };
+    public func compare(c1 : Customer, c2 : Customer) : Order.Order {
+      switch (Text.compare(c1.name, c2.name)) {
+        case (#equal) { Text.compare(c1.email, c2.email) };
         case (order) { order };
       };
     };
   };
 
-  public type Product = {
-    id : Principal;
-    name : Text;
-    unit : Text;
-    price : Float;
-    stock : Nat;
-  };
-
   module Product {
-    public func compare(product1 : Product, product2 : Product) : Order.Order {
-      switch (Text.compare(product1.name, product2.name)) {
-        case (#equal) { Float.compare(product1.price, product2.price) };
+    public func compare(p1 : Product, p2 : Product) : Order.Order {
+      switch (Text.compare(p1.brand, p2.brand)) {
+        case (#equal) { Text.compare(p1.colourName, p2.colourName) };
         case (order) { order };
       };
     };
@@ -68,9 +114,9 @@ actor {
   };
 
   module Invoice {
-    public func compare(invoice1 : Invoice, invoice2 : Invoice) : Order.Order {
-      switch (Float.compare(invoice1.totalPrice(), invoice2.totalPrice())) {
-        case (#equal) { Text.compare(invoice1.id.toText(), invoice2.id.toText()) };
+    public func compare(i1 : Invoice, i2 : Invoice) : Order.Order {
+      switch (Float.compare(i1.totalPrice(), i2.totalPrice())) {
+        case (#equal) { Text.compare(i1.id.toText(), i2.id.toText()) };
         case (order) { order };
       };
     };
@@ -78,7 +124,7 @@ actor {
     public func totalPrice(self : Invoice) : Float {
       self.items.foldLeft(
         0.0,
-        func(acc, item) { acc + item.unitPrice * item.quantity.toFloat() }
+        func(acc, item) { acc + item.unitPrice * item.quantity.toFloat() },
       );
     };
   };
@@ -90,7 +136,7 @@ actor {
     totalPrice : Float;
   };
 
-  // Authorization system (initialized for this actor)
+  // ── Authorization ────────────────────────────────────────────────────────────
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
@@ -100,17 +146,11 @@ actor {
     };
   };
 
-  // Customer operations
+  // ── Customer operations ──────────────────────────────────────────────────────
   public shared ({ caller }) func createCustomer(name : Text, phone : Text, email : Text, address : Text) : async Customer {
     checkAdmin(caller);
     let id = Principal.fromText(name.concat(phone));
-    let customer = {
-      id;
-      name;
-      phone;
-      email;
-      address;
-    };
+    let customer = { id; name; phone; email; address };
     customers.add(id, customer);
     customer;
   };
@@ -122,19 +162,9 @@ actor {
 
   public shared ({ caller }) func updateCustomer(id : Principal, name : Text, phone : Text, email : Text, address : Text) : async Customer {
     checkAdmin(caller);
-    let newCustomer = {
-      id;
-      name;
-      phone;
-      email;
-      address;
-    };
-    updateCustomerInternal(id, newCustomer);
-  };
-
-  func updateCustomerInternal(id : Principal, newCustomer : Customer) : Customer {
-    customers.add(id, newCustomer);
-    newCustomer;
+    let c = { id; name; phone; email; address };
+    customers.add(id, c);
+    c;
   };
 
   public shared ({ caller }) func deleteCustomer(id : Principal) : async () {
@@ -142,61 +172,64 @@ actor {
     customers.remove(id);
   };
 
-  // Product operations
-  public shared ({ caller }) func createProduct(name : Text, unit : Text, price : Float, stock : Nat) : async Product {
+  // ── Product operations (all use productsV2) ──────────────────────────────────
+  public shared ({ caller }) func createProduct(
+    brand : Text,
+    grade : Text,
+    colourCode : Text,
+    colourName : Text,
+    thickness : Float,
+    length : Float,
+    width : Float,
+    qty : Nat,
+    sqft : Float,
+    batchNo : Text,
+    rate : Float,
+  ) : async Product {
     checkAdmin(caller);
-    let id = Principal.fromText(name);
-    let product = {
-      id;
-      name;
-      unit;
-      price;
-      stock;
-    };
-    products.add(id, product);
-    product;
+    let id = Principal.fromText(brand.concat(colourCode).concat(batchNo));
+    let p = { id; brand; grade; colourCode; colourName; thickness; length; width; qty; sqft; batchNo; rate };
+    productsV2.add(id, p);
+    p;
   };
 
   public query ({ caller }) func getAllProducts() : async [Product] {
     checkAdmin(caller);
-    products.values().toArray().sort();
+    productsV2.values().toArray().sort();
   };
 
-  public shared ({ caller }) func updateProduct(id : Principal, name : Text, unit : Text, price : Float, stock : Nat) : async Product {
+  public shared ({ caller }) func updateProduct(
+    id : Principal,
+    brand : Text,
+    grade : Text,
+    colourCode : Text,
+    colourName : Text,
+    thickness : Float,
+    length : Float,
+    width : Float,
+    qty : Nat,
+    sqft : Float,
+    batchNo : Text,
+    rate : Float,
+  ) : async Product {
     checkAdmin(caller);
-    let newProduct = {
-      id;
-      name;
-      unit;
-      price;
-      stock;
-    };
-    updateProductInternal(id, newProduct);
-  };
-
-  func updateProductInternal(id : Principal, newProduct : Product) : Product {
-    products.add(id, newProduct);
-    newProduct;
+    let p = { id; brand; grade; colourCode; colourName; thickness; length; width; qty; sqft; batchNo; rate };
+    productsV2.add(id, p);
+    p;
   };
 
   public shared ({ caller }) func deleteProduct(id : Principal) : async () {
     checkAdmin(caller);
-    products.remove(id);
+    productsV2.remove(id);
   };
 
-  // Invoice operations
+  // ── Invoice operations ───────────────────────────────────────────────────────
   public shared ({ caller }) func createInvoice(customerId : Principal, items : [InvoiceItem], status : InvoiceStatus) : async Invoice {
     checkAdmin(caller);
     let id = Principal.fromText(customerId.toText());
-    let invoice = {
-      id;
-      customerId;
-      date = Time.now();
-      items;
-      status;
-    };
-    invoices.add(id, invoice);
-    invoice;
+    let inv = { id; customerId; date = Time.now(); items; status };
+    invoices.add(id, inv);
+    inv;
   };
 
   public query ({ caller }) func getAllInvoices() : async [Invoice] {
@@ -206,19 +239,9 @@ actor {
 
   public shared ({ caller }) func updateInvoice(id : Principal, customerId : Principal, items : [InvoiceItem], status : InvoiceStatus) : async Invoice {
     checkAdmin(caller);
-    let newInvoice = {
-      id;
-      customerId;
-      date = Time.now();
-      items;
-      status;
-    };
-    updateInvoiceInternal(id, newInvoice);
-  };
-
-  func updateInvoiceInternal(id : Principal, newInvoice : Invoice) : Invoice {
-    invoices.add(id, newInvoice);
-    newInvoice;
+    let inv = { id; customerId; date = Time.now(); items; status };
+    invoices.add(id, inv);
+    inv;
   };
 
   public shared ({ caller }) func deleteInvoice(id : Principal) : async () {

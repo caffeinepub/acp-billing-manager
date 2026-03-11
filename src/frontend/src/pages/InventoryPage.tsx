@@ -29,16 +29,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import {
-  AlertTriangle,
-  Loader2,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-} from "lucide-react";
-import { useState } from "react";
+import { Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   useCreateProduct,
@@ -47,8 +39,21 @@ import {
   useUpdateProduct,
 } from "../hooks/useQueries";
 import type { Product } from "../hooks/useQueries";
+import { formatINR } from "../lib/currency";
 
-const EMPTY_FORM = { name: "", unit: "", price: "", stock: "" };
+const EMPTY_FORM = {
+  brand: "",
+  grade: "",
+  colourCode: "",
+  colourName: "",
+  thickness: "",
+  length: "",
+  width: "",
+  qty: "",
+  sqft: "",
+  batchNo: "",
+  rate: "",
+};
 
 export function InventoryPage() {
   const { data: products = [], isLoading } = useProducts();
@@ -62,8 +67,30 @@ export function InventoryPage() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()),
+  // Auto-calculate SQFT from length * width * qty
+  useEffect(() => {
+    const l = Number.parseFloat(form.length);
+    const w = Number.parseFloat(form.width);
+    const q = Number.parseFloat(form.qty);
+    if (
+      !Number.isNaN(l) &&
+      !Number.isNaN(w) &&
+      !Number.isNaN(q) &&
+      l > 0 &&
+      w > 0 &&
+      q > 0
+    ) {
+      const calculated = (l * w * q).toFixed(2);
+      setForm((f) => ({ ...f, sqft: calculated }));
+    }
+  }, [form.length, form.width, form.qty]);
+
+  const filtered = products.filter(
+    (p) =>
+      p.brand.toLowerCase().includes(search.toLowerCase()) ||
+      p.colourName.toLowerCase().includes(search.toLowerCase()) ||
+      p.colourCode.toLowerCase().includes(search.toLowerCase()) ||
+      p.batchNo.toLowerCase().includes(search.toLowerCase()),
   );
 
   function openAdd() {
@@ -75,39 +102,80 @@ export function InventoryPage() {
   function openEdit(p: Product) {
     setEditing(p);
     setForm({
-      name: p.name,
-      unit: p.unit,
-      price: String(p.price),
-      stock: String(p.stock),
+      brand: p.brand,
+      grade: p.grade,
+      colourCode: p.colourCode,
+      colourName: p.colourName,
+      thickness: String(p.thickness),
+      length: String(p.length),
+      width: String(p.width),
+      qty: String(p.qty),
+      sqft: String(p.sqft),
+      batchNo: p.batchNo,
+      rate: String(p.rate),
     });
     setDialogOpen(true);
   }
 
   async function handleSubmit() {
-    const price = Number.parseFloat(form.price);
-    const stock = BigInt(form.stock || "0");
-    if (!form.name || !form.unit || Number.isNaN(price)) {
+    if (
+      !form.brand ||
+      !form.grade ||
+      !form.colourCode ||
+      !form.colourName ||
+      !form.batchNo
+    ) {
       toast.error("Please fill in all required fields");
+      return;
+    }
+    const thickness = Number.parseFloat(form.thickness || "0");
+    const length = Number.parseFloat(form.length || "0");
+    const width = Number.parseFloat(form.width || "0");
+    const qty = BigInt(form.qty || "0");
+    const sqft = Number.parseFloat(form.sqft || "0");
+    const rate = Number.parseFloat(form.rate || "0");
+    if (
+      Number.isNaN(thickness) ||
+      Number.isNaN(length) ||
+      Number.isNaN(width) ||
+      Number.isNaN(sqft) ||
+      Number.isNaN(rate)
+    ) {
+      toast.error("Please enter valid numbers");
       return;
     }
     try {
       if (editing) {
         await updateMut.mutateAsync({
           id: editing.id,
-          name: form.name,
-          unit: form.unit,
-          price,
-          stock,
+          brand: form.brand,
+          grade: form.grade,
+          colourCode: form.colourCode,
+          colourName: form.colourName,
+          thickness,
+          length,
+          width,
+          qty,
+          sqft,
+          batchNo: form.batchNo,
+          rate,
         });
         toast.success("Product updated");
       } else {
         await createMut.mutateAsync({
-          name: form.name,
-          unit: form.unit,
-          price,
-          stock,
+          brand: form.brand,
+          grade: form.grade,
+          colourCode: form.colourCode,
+          colourName: form.colourName,
+          thickness,
+          length,
+          width,
+          qty,
+          sqft,
+          batchNo: form.batchNo,
+          rate,
         });
-        toast.success("Product created");
+        toast.success("Product added");
       }
       setDialogOpen(false);
     } catch {
@@ -127,7 +195,6 @@ export function InventoryPage() {
   }
 
   const isPending = createMut.isPending || updateMut.isPending;
-  const lowStockCount = products.filter((p) => p.stock < 10n).length;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -138,11 +205,6 @@ export function InventoryPage() {
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
             {products.length} products
-            {lowStockCount > 0 && (
-              <span className="ml-2 text-amber-400 font-medium">
-                · {lowStockCount} low stock
-              </span>
-            )}
           </p>
         </div>
         <Button
@@ -155,20 +217,10 @@ export function InventoryPage() {
         </Button>
       </div>
 
-      {lowStockCount > 0 && (
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>
-            {lowStockCount} product{lowStockCount > 1 ? "s are" : " is"} running
-            low on stock (below 10 units)
-          </span>
-        </div>
-      )}
-
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Search products..."
+          placeholder="Search by brand, colour name, code or batch..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-9"
@@ -176,7 +228,7 @@ export function InventoryPage() {
         />
       </div>
 
-      <div className="border border-border rounded-lg overflow-hidden">
+      <div className="border border-border rounded-lg overflow-hidden overflow-x-auto">
         {isLoading ? (
           <div className="p-6 space-y-3" data-ocid="inventory.loading_state">
             {["a", "b", "c", "d", "e"].map((k) => (
@@ -195,135 +247,225 @@ export function InventoryPage() {
           <Table data-ocid="inventory.table">
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <TableHead>Product Name</TableHead>
-                <TableHead>Unit</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Stock</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Brand</TableHead>
+                <TableHead>Grade</TableHead>
+                <TableHead>C.Code</TableHead>
+                <TableHead>Colour Name</TableHead>
+                <TableHead>Thickness</TableHead>
+                <TableHead>L x W</TableHead>
+                <TableHead>Qty</TableHead>
+                <TableHead>SQFT</TableHead>
+                <TableHead>Batch No</TableHead>
+                <TableHead>Rate (₹)</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((p, i) => {
-                const isLow = p.stock < 10n;
-                return (
-                  <TableRow
-                    key={p.id.toString()}
-                    className={cn("border-border", isLow && "bg-amber-500/5")}
-                    data-ocid={`inventory.item.${i + 1}` as any}
-                  >
-                    <TableCell className="font-medium">{p.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {p.unit}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      ${p.price.toFixed(2)}
-                    </TableCell>
-                    <TableCell
-                      className={cn("font-medium", isLow && "text-amber-400")}
-                    >
-                      {String(p.stock)}
-                    </TableCell>
-                    <TableCell>
-                      {isLow ? (
-                        <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500/20">
-                          Low Stock
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-primary/20 text-primary border-primary/30 hover:bg-primary/20">
-                          In Stock
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEdit(p)}
-                          data-ocid={`inventory.edit_button.${i + 1}` as any}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setDeleteTarget(p)}
-                          data-ocid={`inventory.delete_button.${i + 1}` as any}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {filtered.map((p, i) => (
+                <TableRow
+                  key={p.id.toString()}
+                  className="border-border"
+                  data-ocid={`inventory.item.${i + 1}` as any}
+                >
+                  <TableCell className="font-medium">{p.brand}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{p.grade}</Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {p.colourCode}
+                  </TableCell>
+                  <TableCell>{p.colourName}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {p.thickness} mm
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {p.length} x {p.width}
+                  </TableCell>
+                  <TableCell className="font-medium">{String(p.qty)}</TableCell>
+                  <TableCell className="font-medium">
+                    {p.sqft.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {p.batchNo}
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {formatINR(p.rate)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(p)}
+                        data-ocid={`inventory.edit_button.${i + 1}` as any}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeleteTarget(p)}
+                        data-ocid={`inventory.delete_button.${i + 1}` as any}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         )}
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent data-ocid="inventory.dialog">
+        <DialogContent className="max-w-2xl" data-ocid="inventory.dialog">
           <DialogHeader>
             <DialogTitle className="font-display">
               {editing ? "Edit Product" : "Add Product"}
             </DialogTitle>
             <DialogDescription>
-              Fill in the product details below.
+              Fill in all the ACP panel details below.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="grid grid-cols-2 gap-4 py-2">
             <div className="space-y-1.5">
-              <Label>Product Name</Label>
+              <Label>Brand *</Label>
               <Input
-                value={form.name}
+                value={form.brand}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, name: e.target.value }))
+                  setForm((f) => ({ ...f, brand: e.target.value }))
                 }
-                placeholder="ACP Panel 4mm"
-                data-ocid="inventory.name.input"
+                placeholder="e.g. Alucobond"
+                data-ocid="inventory.brand.input"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Unit</Label>
-                <Input
-                  value={form.unit}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, unit: e.target.value }))
-                  }
-                  placeholder="sheet"
-                  data-ocid="inventory.unit.input"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Price ($)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.price}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, price: e.target.value }))
-                  }
-                  placeholder="0.00"
-                  data-ocid="inventory.price.input"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label>Grade *</Label>
+              <Input
+                value={form.grade}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, grade: e.target.value }))
+                }
+                placeholder="e.g. A1, FR"
+                data-ocid="inventory.grade.input"
+              />
             </div>
             <div className="space-y-1.5">
-              <Label>Stock Quantity</Label>
+              <Label>C.Code *</Label>
+              <Input
+                value={form.colourCode}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, colourCode: e.target.value }))
+                }
+                placeholder="e.g. P001"
+                data-ocid="inventory.colour_code.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Colour Name *</Label>
+              <Input
+                value={form.colourName}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, colourName: e.target.value }))
+                }
+                placeholder="e.g. Silver Metallic"
+                data-ocid="inventory.colour_name.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Thickness (mm)</Label>
               <Input
                 type="number"
                 min="0"
-                value={form.stock}
+                step="0.01"
+                value={form.thickness}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, stock: e.target.value }))
+                  setForm((f) => ({ ...f, thickness: e.target.value }))
+                }
+                placeholder="e.g. 4"
+                data-ocid="inventory.thickness.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Batch No *</Label>
+              <Input
+                value={form.batchNo}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, batchNo: e.target.value }))
+                }
+                placeholder="e.g. B2024-01"
+                data-ocid="inventory.batch_no.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Length (ft)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.length}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, length: e.target.value }))
+                }
+                placeholder="e.g. 8"
+                data-ocid="inventory.length.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Width (ft)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.width}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, width: e.target.value }))
+                }
+                placeholder="e.g. 4"
+                data-ocid="inventory.width.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Qty (sheets)</Label>
+              <Input
+                type="number"
+                min="0"
+                value={form.qty}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, qty: e.target.value }))
                 }
                 placeholder="0"
-                data-ocid="inventory.stock.input"
+                data-ocid="inventory.qty.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>SQFT (auto-calculated)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.sqft}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, sqft: e.target.value }))
+                }
+                placeholder="0.00"
+                data-ocid="inventory.sqft.input"
+              />
+            </div>
+            <div className="space-y-1.5 col-span-2">
+              <Label>Rate (₹ per SQFT)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.rate}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, rate: e.target.value }))
+                }
+                placeholder="0.00"
+                data-ocid="inventory.rate.input"
               />
             </div>
           </div>
@@ -358,8 +500,10 @@ export function InventoryPage() {
             <AlertDialogTitle>Delete Product</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete{" "}
-              <strong>{deleteTarget?.name}</strong>? This action cannot be
-              undone.
+              <strong>
+                {deleteTarget?.brand} - {deleteTarget?.colourName}
+              </strong>
+              ? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

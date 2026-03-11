@@ -111,10 +111,17 @@ export interface Customer {
 }
 export interface Product {
     id: Principal;
-    name: string;
-    unit: string;
-    stock: bigint;
-    price: number;
+    brand: string;
+    grade: string;
+    colourCode: string;
+    colourName: string;
+    thickness: number;
+    length: number;
+    width: number;
+    qty: bigint;
+    sqft: number;
+    batchNo: string;
+    rate: number;
 }
 export enum InvoiceStatus {
     paid = "paid",
@@ -130,7 +137,7 @@ export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createCustomer(name: string, phone: string, email: string, address: string): Promise<Customer>;
     createInvoice(customerId: Principal, items: Array<InvoiceItem>, status: InvoiceStatus): Promise<Invoice>;
-    createProduct(name: string, unit: string, price: number, stock: bigint): Promise<Product>;
+    createProduct(brand: string, grade: string, colourCode: string, colourName: string, thickness: number, length: number, width: number, qty: bigint, sqft: number, batchNo: string, rate: number): Promise<Product>;
     deleteCustomer(id: Principal): Promise<void>;
     deleteInvoice(id: Principal): Promise<void>;
     deleteProduct(id: Principal): Promise<void>;
@@ -141,7 +148,7 @@ export interface backendInterface {
     isCallerAdmin(): Promise<boolean>;
     updateCustomer(id: Principal, name: string, phone: string, email: string, address: string): Promise<Customer>;
     updateInvoice(id: Principal, customerId: Principal, items: Array<InvoiceItem>, status: InvoiceStatus): Promise<Invoice>;
-    updateProduct(id: Principal, name: string, unit: string, price: number, stock: bigint): Promise<Product>;
+    updateProduct(id: Principal, brand: string, grade: string, colourCode: string, colourName: string, thickness: number, length: number, width: number, qty: bigint, sqft: number, batchNo: string, rate: number): Promise<Product>;
 }
 import type { Invoice as _Invoice, InvoiceItem as _InvoiceItem, InvoiceStatus as _InvoiceStatus, Time as _Time, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -202,17 +209,17 @@ export class Backend implements backendInterface {
             return from_candid_Invoice_n5(this._uploadFile, this._downloadFile, result);
         }
     }
-    async createProduct(arg0: string, arg1: string, arg2: number, arg3: bigint): Promise<Product> {
+    async createProduct(arg0: string, arg1: string, arg2: string, arg3: string, arg4: number, arg5: number, arg6: number, arg7: bigint, arg8: number, arg9: string, arg10: number): Promise<Product> {
         if (this.processError) {
             try {
-                const result = await this.actor.createProduct(arg0, arg1, arg2, arg3);
+                const result = await this.actor.createProduct(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createProduct(arg0, arg1, arg2, arg3);
+            const result = await this.actor.createProduct(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
             return result;
         }
     }
@@ -356,17 +363,17 @@ export class Backend implements backendInterface {
             return from_candid_Invoice_n5(this._uploadFile, this._downloadFile, result);
         }
     }
-    async updateProduct(arg0: Principal, arg1: string, arg2: string, arg3: number, arg4: bigint): Promise<Product> {
+    async updateProduct(arg0: Principal, arg1: string, arg2: string, arg3: string, arg4: string, arg5: number, arg6: number, arg7: number, arg8: bigint, arg9: number, arg10: string, arg11: number): Promise<Product> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateProduct(arg0, arg1, arg2, arg3, arg4);
+                const result = await this.actor.updateProduct(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateProduct(arg0, arg1, arg2, arg3, arg4);
+            const result = await this.actor.updateProduct(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
             return result;
         }
     }

@@ -50,6 +50,7 @@ import {
   useUpdateInvoice,
 } from "../hooks/useQueries";
 import type { Invoice, InvoiceItem } from "../hooks/useQueries";
+import { formatINR } from "../lib/currency";
 
 function formatDate(date: bigint) {
   return new Date(Number(date / 1_000_000n)).toLocaleDateString();
@@ -103,7 +104,11 @@ export function InvoicesPage() {
   const productMap = useMemo(() => {
     const m = new Map<string, { name: string; price: number; unit: string }>();
     for (const p of products)
-      m.set(p.id.toString(), { name: p.name, price: p.price, unit: p.unit });
+      m.set(p.id.toString(), {
+        name: `${p.brand} - ${p.colourName}`,
+        price: p.rate,
+        unit: "SQFT",
+      });
     return m;
   }, [products]);
 
@@ -270,11 +275,7 @@ export function InvoicesPage() {
                     {inv.items.length} item{inv.items.length !== 1 ? "s" : ""}
                   </TableCell>
                   <TableCell className="font-medium">
-                    $
-                    {invoiceTotal(inv.items).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {formatINR(invoiceTotal(inv.items))}
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -435,7 +436,7 @@ export function InvoicesPage() {
                           key={p.id.toString()}
                           value={p.id.toString()}
                         >
-                          {p.name} — ${p.price.toFixed(2)}/{p.unit}
+                          {p.brand} - {p.colourName} — {formatINR(p.rate)}/SQFT
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -455,7 +456,7 @@ export function InvoicesPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">Unit Price ($)</Label>
+                      <Label className="text-xs">Unit Price (₹)</Label>
                       <Input
                         type="number"
                         min="0"
@@ -470,11 +471,11 @@ export function InvoicesPage() {
                     </div>
                   </div>
                   <p className="text-right text-sm font-medium text-primary">
-                    Subtotal: $
-                    {(
+                    Subtotal:{" "}
+                    {formatINR(
                       (Number.parseFloat(li.quantity) || 0) *
-                      (Number.parseFloat(li.unitPrice) || 0)
-                    ).toFixed(2)}
+                        (Number.parseFloat(li.unitPrice) || 0),
+                    )}
                   </p>
                 </div>
               ))}
@@ -483,11 +484,7 @@ export function InvoicesPage() {
             <div className="flex justify-between items-center p-3 rounded-lg bg-primary/10 border border-primary/20">
               <span className="font-medium">Grand Total</span>
               <span className="font-display text-xl font-bold text-primary">
-                $
-                {grandTotal.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
+                {formatINR(grandTotal)}
               </span>
             </div>
           </div>
@@ -569,10 +566,10 @@ export function InvoicesPage() {
                           {String(item.quantity)} {prod?.unit ?? ""}
                         </TableCell>
                         <TableCell className="text-right">
-                          ${item.unitPrice.toFixed(2)}
+                          {formatINR(item.unitPrice)}
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          ${(Number(item.quantity) * item.unitPrice).toFixed(2)}
+                          {formatINR(Number(item.quantity) * item.unitPrice)}
                         </TableCell>
                       </TableRow>
                     );
@@ -583,11 +580,7 @@ export function InvoicesPage() {
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Grand Total</span>
                 <span className="font-display text-2xl font-bold text-primary">
-                  $
-                  {invoiceTotal(detailInvoice.items).toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {formatINR(invoiceTotal(detailInvoice.items))}
                 </span>
               </div>
             </div>

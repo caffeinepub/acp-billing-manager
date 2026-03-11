@@ -29,10 +29,17 @@ export interface Customer {
 }
 export interface Product {
     id: Principal;
-    name: string;
-    unit: string;
-    stock: bigint;
-    price: number;
+    brand: string;
+    grade: string;
+    colourCode: string;
+    colourName: string;
+    thickness: number;
+    length: number;
+    width: number;
+    qty: bigint;
+    sqft: number;
+    batchNo: string;
+    rate: number;
 }
 export enum InvoiceStatus {
     paid = "paid",
@@ -47,7 +54,7 @@ export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createCustomer(name: string, phone: string, email: string, address: string): Promise<Customer>;
     createInvoice(customerId: Principal, items: Array<InvoiceItem>, status: InvoiceStatus): Promise<Invoice>;
-    createProduct(name: string, unit: string, price: number, stock: bigint): Promise<Product>;
+    createProduct(brand: string, grade: string, colourCode: string, colourName: string, thickness: number, length: number, width: number, qty: bigint, sqft: number, batchNo: string, rate: number): Promise<Product>;
     deleteCustomer(id: Principal): Promise<void>;
     deleteInvoice(id: Principal): Promise<void>;
     deleteProduct(id: Principal): Promise<void>;
@@ -58,5 +65,5 @@ export interface backendInterface {
     isCallerAdmin(): Promise<boolean>;
     updateCustomer(id: Principal, name: string, phone: string, email: string, address: string): Promise<Customer>;
     updateInvoice(id: Principal, customerId: Principal, items: Array<InvoiceItem>, status: InvoiceStatus): Promise<Invoice>;
-    updateProduct(id: Principal, name: string, unit: string, price: number, stock: bigint): Promise<Product>;
+    updateProduct(id: Principal, brand: string, grade: string, colourCode: string, colourName: string, thickness: number, length: number, width: number, qty: bigint, sqft: number, batchNo: string, rate: number): Promise<Product>;
 }
